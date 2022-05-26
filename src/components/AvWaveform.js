@@ -157,7 +157,12 @@ const props = {
   requester: {
     type: Function,
     default: axios
-  }
+  },
+
+  clipBoundaries:{
+    type: Object,
+    default: {start:-1,end:-1}
+  },
 }
 
 /**
@@ -174,7 +179,7 @@ const AvWaveform = {
       ctx: null,
       audio: null,
       duration: null,
-      peaks: []
+      peaks: [],
     }
   },
   mounted () {
@@ -218,6 +223,7 @@ const AvWaveform = {
      */
     decode: function (response) {
       /* istanbul ignore next */
+      console.log(response)
       const ctx = new AudioContext()
       /* istanbul ignore next */
       ctx.decodeAudioData(response.data, (audioBuffer) => {
@@ -273,24 +279,33 @@ const AvWaveform = {
       this.peaks = peaks
 
       if (this.playtimeClickable) {
+        this.ctxWrapper.tabIndex = 1
         this.ctxWrapper.addEventListener('click', (e) => this.updateTime(e))
+        this.ctxWrapper.addEventListener('keydown', (e) => this.keyDown(e))
+        window.addEventListener('keydown', (e) => this.keyDownWindow(e))
+        document.addEventListener('click', (e) => this.ctxWrapper.focus())
       }
       this.waveform()
+      this.ctxWrapper.focus()
     },
 
     /**
      * Draw wave form.
      */
     waveform: function () {
+      console.log("asd")
+      console.log(this.clipBoundaries.start, this.clipBoundaries.end)
       const peaks = this.peaks
       const time = this.audio.currentTime
       const playX = this.playX(time)
       let x = 0
       this.ctx.clearRect(0, 0, this.canvWidth, this.canvHeight)
-      x = this.draw(peaks.slice(0, playX), this.playedLineWidth, this.playedLineColor, x)
+      if (this.clipBoundaries.start >= 0 && this.clipBoundaries.end >= 0) this.drawClipBox(this.clipBoundaries.start, this.clipBoundaries.end)
+      x = this.draw(peaks.slice(0, playX), this.playedLineWidth, this.noplayedLineColor, x)
       this.draw(peaks.slice(playX), this.noplayedLineWidth, this.noplayedLineColor, x)
       this.drawSlider(time)
       if (this.playtime) this.drawTime(time)
+      if (this.clipBoundaries.start >= 0) this.drawCursor(this.clipBoundaries.start)
     },
 
     /**
@@ -379,6 +394,39 @@ const AvWaveform = {
     },
 
     /**
+     * Draw played slider.
+     * @param {Number} Played time sec.millisec.
+     * @return {Void}
+     */
+     drawCursor: function (time) {
+      const playX = this.playX(time)
+      this.ctx.lineWidth = this.playtimeSliderWidth
+      this.ctx.strokeStyle = "#000000"
+      this.ctx.beginPath()
+      this.ctx.moveTo(playX, 0)
+      this.ctx.lineTo(playX, this.canvHeight)
+      this.ctx.stroke()
+    },
+
+    /**
+     * Draw clip box.
+     * @param {start} Start time sec.millisec.
+     * @param {end} End time sec.millisec.
+     * @return {Void}
+     */
+     drawClipBox: function (start, end) {
+      const startX = this.playX(start)
+      const endX = this.playX(end)
+      console.log(start, end)
+      const oldStyle = this.ctx.fillStyle
+      this.ctx.fillStyle = "#0000FF";
+      this.ctx.globalAlpha = 0.4
+      this.ctx.fillRect(startX,0,endX-startX,this.canvHeight);
+      this.ctx.globalAlpha = 1.0
+      this.ctx.fillStyle = oldStyle
+    },
+
+    /**
      * Get x coodrinate for play time.
      * @param {Number}
      * @return {Number}
@@ -393,11 +441,87 @@ const AvWaveform = {
      */
     updateTime: function (e) {
       this.audio.currentTime = e.offsetX / this.canvWidth * this.duration
+      //if (this.audio.currentTime < this.clipStart) this.audio.currentTime = this.clipStart
+      //if (this.audio.currentTime > this.clipEnd) this.audio.currentTime = this.clipStart
       if (!this.animId) {
         // re-draw if animation is not running
         this.waveform()
       }
     },
+
+    /**
+     * Audio playback in out callback.
+     * @param event
+     */
+     keyDown: function (e) {
+      switch (e.code) {
+        case "KeyI":
+          this.clipBoundaries.start = this.audio.currentTime
+          if (this.clipBoundaries.start >= this.clipBoundaries.end)
+            this.clipBoundaries.end = -1
+          e.stopPropagation()
+          e.preventDefault()
+          break
+        case "KeyO":
+          this.clipBoundaries.end = this.audio.currentTime
+          if (this.clipBoundaries.start >= this.clipBoundaries.end)
+            this.clipBoundaries.end = -1
+          e.stopPropagation()
+          e.preventDefault()
+          break
+        case "Escape":
+          this.clipBoundaries.end = -1
+          this.clipBoundaries.start = -1
+          break
+        case "Space":
+          if (e.ctrlKey) {
+            this.audio.currentTime = this.clipBoundaries.start
+            this.audio.play()
+            break
+          }
+          if (this.audio.paused)
+            this.audio.play()
+          else
+            this.audio.pause()
+          e.stopPropagation()
+          e.preventDefault()
+          break
+        case "ArrowLeft":
+          if (e.altKey)
+            this.audio.currentTime -= 0.01
+          else 
+            this.audio.currentTime -= 0.05
+          e.stopPropagation()
+          e.preventDefault()
+          break
+        case "ArrowRight":
+          if (e.altKey)
+            this.audio.currentTime += 0.01
+          else
+            this.audio.currentTime += 0.05
+          e.stopPropagation()
+          e.preventDefault()
+          break
+        case "KeyP":
+          if (this.audio.paused)
+            this.audio.play()
+          else
+            this.audio.pause()
+          e.stopPropagation()
+          e.preventDefault()
+          break
+      }
+      this.waveform()
+      //console.log(e.code)
+      //console.log(e.ctrlKey)
+    },
+
+    keyDownWindow: function (e) {
+      if (e.ctrlKey) {
+        this.keyDown(e)
+      }
+    },
+
 
     /**
      * Audio source download progress
