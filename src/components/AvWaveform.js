@@ -283,7 +283,7 @@ const AvWaveform = {
         this.ctxWrapper.addEventListener('click', (e) => this.updateTime(e))
         this.ctxWrapper.addEventListener('keydown', (e) => this.keyDown(e))
         window.addEventListener('keydown', (e) => this.keyDownWindow(e))
-        document.addEventListener('click', (e) => this.ctxWrapper.focus())
+        //document.addEventListener('click', (e) => this.ctxWrapper.focus())
       }
       this.waveform()
       this.ctxWrapper.focus()
@@ -293,8 +293,8 @@ const AvWaveform = {
      * Draw wave form.
      */
     waveform: function () {
-      console.log("asd")
-      console.log(this.clipBoundaries.start, this.clipBoundaries.end)
+      //console.log("asd")
+      //console.log(this.clipBoundaries.start, this.clipBoundaries.end)
       const peaks = this.peaks
       const time = this.audio.currentTime
       const playX = this.playX(time)
